@@ -4,3 +4,4 @@ geemap==0.34.1
 pandas
 python-box==7.0.1
 setuptools
+pkg_resources
