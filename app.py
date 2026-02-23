@@ -5,10 +5,10 @@ import pandas as pd
 from datetime import datetime
 from geopy.geocoders import Nominatim
 
-# Configuração de Interface (Layer 2: UI Wide)
-st.set_page_config(layout="wide", page_title="GEOSPECTRA V1.60")
+# Configuração de Interface Profissional (Layer 2)
+st.set_page_config(layout="wide", page_title="GEOSPECTRA V1.60 FINAL")
 
-# --- L1: OS 14 MINERAIS (SISTEMA GEOSPECTRA) ---
+# --- L1: OS 14 MINERAIS ---
 db_mineral = {
     'Ouro (Nativo/Sufetos)': {'b': ('B11', 'B2'), 'lim': 2.15},
     'Lítio (Pegmatitos)': {'b': ('B11', 'B8'), 'lim': 1.70},
@@ -26,46 +26,37 @@ db_mineral = {
     'Platina/Paládio': {'b': ('B12', 'B8'), 'lim': 1.85}
 }
 
-# --- INTERFACE LATERAL ---
 st.sidebar.title("💎 GEOSPECTRA V1.60")
-cidade_txt = st.sidebar.text_input('🏙️ Localidade:', 'Canaã dos Carajás, PA')
-mineral_sel = st.sidebar.selectbox('💎 Selecione o Mineral:', sorted(list(db_mineral.keys())))
+cidade = st.sidebar.text_input('🏙️ Localidade:', 'Canaã dos Carajás, PA')
+mineral = st.sidebar.selectbox('💎 Selecione o Mineral:', sorted(list(db_mineral.keys())))
 sensib = st.sidebar.slider('🎚️ Sensibilidade Espectral:', 0.01, 4.0, 1.21, 0.01)
 
 if st.sidebar.button("🚀 EXECUTAR VARREDURA"):
     try:
-        # Inicializa o motor do Google
         ee.Initialize()
-        
-        # Converte nome da cidade em coordenadas (Sua solicitação de 22/02)
-        geolocator = Nominatim(user_agent="geos_app")
-        loc = geolocator.geocode(cidade_txt)
-        
+        loc = Nominatim(user_agent="geos_app_v160").geocode(cidade)
         if loc:
             ponto = ee.Geometry.Point([loc.longitude, loc.latitude])
             area = ponto.buffer(10000).bounds()
             
-            # Engine Layer 4: Busca Infinita Sentinel-2
+            # Engine L4 (Sentinel-2)
             s2 = ee.ImageCollection('COPERNICUS/S2_SR_HARMONIZED').filterBounds(area).sort('system:time_start', False).filter(ee.Filter.lt('CLOUDY_PIXEL_PERCENTAGE', 20)).first().clip(area)
             scan_date = datetime.fromtimestamp(s2.get('system:time_start').getInfo()/1000.0).strftime('%d/%m/%Y')
             
-            # Processamento Mineral
-            m = db_mineral[mineral_sel]
+            m = db_mineral[mineral]
             ratio = s2.select(m['b'][0]).divide(s2.select(m['b'][1])).rename('val')
             mask = ratio.gt(sensib).And(s2.normalizedDifference(['B8', 'B4']).lt(0.45))
             alvos_img = ratio.updateMask(mask)
             
-            # Mostra Resultados
-            col1, col2 = st.columns(2)
-            col1.metric("Status", "✅ Concluído")
-            col2.metric("Data do Scan", scan_date)
+            st.metric("Alvos Detectados em", scan_date)
             
+            # Mapa Estável
             Map = geemap.Map(center=[loc.latitude, loc.longitude], zoom=13)
             Map.add_basemap('HYBRID')
             Map.addLayer(s2, {'bands':['B12','B8','B4'], 'max':3500}, 'Satélite')
-            Map.addLayer(alvos_img, {'min':sensib, 'max':sensib+0.5, 'palette':['blue','yellow','red']}, 'Detecção')
+            Map.addLayer(alvos_img, {'min':sensib, 'max':sensib+0.5, 'palette':['blue','yellow','red']}, 'Detecção Mineral')
             Map.to_streamlit(height=700)
         else:
-            st.error("Cidade não encontrada. Tente: Cidade, Estado")
+            st.error("Local não encontrado.")
     except Exception as e:
-        st.error(f"Erro no Servidor: {e}")
+        st.error(f"Erro no motor: {e}")
