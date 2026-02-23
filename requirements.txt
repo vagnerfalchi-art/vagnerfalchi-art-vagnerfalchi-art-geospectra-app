@@ -4,3 +4,4 @@ geemap==0.32.1
 pandas
 geopy
 python-box==6.1.0
+setuptools
