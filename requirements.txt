@@ -3,5 +3,5 @@ earthengine-api
 geemap==0.34.1
 pandas
 python-box==7.0.1
-setuptools
+setuptools==68.2.2
 ipython
